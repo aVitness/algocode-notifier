@@ -16,7 +16,7 @@
 git clone https://github.com/aVitness/algocode-notifier.git
 cd algocode-notifier
 pip install -r ./requirements.txt
-python main.
+python main.py
 ```
 
 * Перед запуском:
