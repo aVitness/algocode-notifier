@@ -1,0 +1,7 @@
+schedule
+pytz
+telebot
+selenium
+tabulate
+psycopg3
+python-dotenv

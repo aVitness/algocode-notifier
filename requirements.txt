@@ -1,0 +1,5 @@
+aiohttp
+aiogram
+tabulate
+pytz
+python-dotenv
