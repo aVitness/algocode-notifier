@@ -350,13 +350,15 @@ async def users_list(message: types.Message):
 async def task(sleep_for):
     global should_run, filename
     while True:
-        await asyncio.sleep(sleep_for)
-        filename = f'archive/{time_now().strftime("%m-%d")}'
-        await job()
-        if time_now() >= should_run:
-            await leaderboard()
-            should_run += timedelta(days=1)
-
+        try:
+            await asyncio.sleep(sleep_for)
+            filename = f'archive/{time_now().strftime("%m-%d")}'
+            await job()
+            if time_now() >= should_run:
+                await leaderboard()
+                should_run += timedelta(days=1)
+        except Exception as e:
+            logging.error(f"Got an error: {e}")
 
 async def main():
     global old_data
