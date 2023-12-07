@@ -15,7 +15,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from tabulate import tabulate
 
 from config import *
-from utils import batched, load_from_file, save_to_file
+from utils import batched, format_time, load_from_file, replace_decl, save_to_file
 
 bot = Bot(token=TELEGRAM_TOKEN)
 dispatcher = Dispatcher()
@@ -31,12 +31,6 @@ with open("chats.json", "r", encoding="utf-8") as file:
     chats = json.load(file)
     for key in chats:
         chats[key] = set(chats[key])
-
-
-def replace_decl(s):
-    for x, repl in ((" 1 неверных посылок", " 1 неверной посылки"), (" 1 попытками", " 1 попыткой"), (" 1 попыток", " 1 попытки"), (" 1 ошибки", " 1 ошибку")):
-        s = s.replace(x, repl)
-    return s
 
 
 async def send_messages(changes):
@@ -198,6 +192,8 @@ async def show_first_callback(callback: types.CallbackQuery):
     while len(solves) < 3:
         solves.append((-1, "-"))
     result_string = first_solves_message.format(first=solves[0][1], second=solves[1][1], third=solves[2][1],
+                                                time_first=format_time(solves[0][0]), time_second=format_time(solves[1][0]),
+                                                time_third=format_time(solves[2][0]),
                                                 task=f"{contest_title} - {task_l} ({task['long']})")
 
     builder = InlineKeyboardBuilder()
@@ -293,13 +289,7 @@ async def stats_callback(callback: types.CallbackQuery):
     table_data = []
     for i in range(len(contest["problems"])):
         t = int(solves[i]["time"])
-        if t == 0:
-            t = None
-        else:
-            h, m = divmod(t, 3600)
-            m, s = divmod(m, 60)
-            t = f"{h}:{m:02}:{s:02}"
-        table_data.append((f"{contest['problems'][i]['short']}. {contest['problems'][i]['long']}", solves[i]["penalty"], solves[i]["verdict"], t))
+        table_data.append((f"{contest['problems'][i]['short']}. {contest['problems'][i]['long']}", solves[i]["penalty"], solves[i]["verdict"], format_time(t)))
     result_string = "```\n" + tabulate(table_data, headers, colalign=align) + "\n```"
     buttons = [
         [types.InlineKeyboardButton(text=text, callback_data="*" + text + ":" + user_id) for text in row]
@@ -359,6 +349,7 @@ async def task(sleep_for):
                 should_run += timedelta(days=1)
         except Exception as e:
             logging.error(f"Got an error: {e}")
+
 
 async def main():
     global old_data
