@@ -28,8 +28,8 @@ def replace_decl(s):
 
 
 def format_time(seconds):
-    if not seconds:
-        return ""
+    if seconds <= 0:
+        return None
     h, m = divmod(seconds, 3600)
     m, s = divmod(m, 60)
     return f"{h}:{m:02}:{s:02}"

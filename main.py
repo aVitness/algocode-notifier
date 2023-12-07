@@ -18,7 +18,7 @@ from config import *
 from utils import batched, format_time, load_from_file, replace_decl, save_to_file
 
 bot = Bot(token=TELEGRAM_TOKEN)
-dispatcher = Dispatcher()
+dispatcher = Dispatcher(disable_fsm=True)
 should_run = time_now().replace(hour=23, minute=0, second=0)
 if time_now() >= should_run:
     should_run += timedelta(days=1)
@@ -191,10 +191,11 @@ async def show_first_callback(callback: types.CallbackQuery):
     solves = sorted(solves)[:3]
     while len(solves) < 3:
         solves.append((-1, "-"))
-    result_string = first_solves_message.format(first=solves[0][1], second=solves[1][1], third=solves[2][1],
-                                                time_first=format_time(solves[0][0]), time_second=format_time(solves[1][0]),
-                                                time_third=format_time(solves[2][0]),
-                                                task=f"{contest_title} - {task_l} ({task['long']})")
+    solves = [
+        name + (f" ({format_time(time)})" if time > 0 else "")
+        for time, name in solves
+    ]
+    result_string = first_solves_message.format(first=solves[0], second=solves[1], third=solves[2], task=f"{contest_title} - {task_l} ({task['long']})")
 
     builder = InlineKeyboardBuilder()
     for i in range(len(contest["problems"])):
