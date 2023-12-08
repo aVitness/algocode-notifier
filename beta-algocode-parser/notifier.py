@@ -34,6 +34,7 @@ def send_new_solves(name, solves):
     for task in solves:
         bot.send_message(CHAT_ID, first_solve_message.format(name=name, task=task), parse_mode="markdown")
 
+
 def find_people_results(source, skip):
     s = re.findall(r'<td class=""[^>]*>[0-9]+</td><td class=""[^>]*>[Bs]+</td><td class="name"[^>]*>[а-яА-ЯёЁ\- ]+</td>', source)
     A = set()
@@ -261,7 +262,8 @@ def job():
         if new_solves:
             send_new_solves(full_name, new_solves)
     save(A)
-    
+
+
 if "leaderboard" in sys.argv:
     leaderboard()
     exit()

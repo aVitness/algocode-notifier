@@ -1,3 +1,4 @@
+import json
 import os
 from datetime import datetime
 
@@ -10,6 +11,21 @@ CHAT_ID = "@yandex_b_notifications"
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 STANDING_PAGE = "https://algocode.ru/standings_data/b_fall_2023/"
 time_now = lambda: datetime.now(tz=timezone("Europe/Moscow"))
+
+
+class CONFIG:
+    filename = f'archive/{time_now().strftime("%m-%d")}'
+    data = {}
+    old_data = {}
+    users = {}
+    user_id_by_name = {}
+    chats = {}
+
+
+with open("chats.json", "r", encoding="utf-8") as file:
+    chats = json.load(file)
+    for key in chats:
+        chats[key] = set(chats[key])
 
 female_names = {'Валентина', 'Алена', 'Елена', 'Ксения', 'Анастасия', 'Татьяна', 'Милана', 'Олеся', 'Виктория', 'Надежда', 'Юлия', 'Ярослава', 'София', 'Мария',
                 'Софья', 'Дарья', 'Алина', 'Валерия', 'Ирина', 'Арина', 'Елизавета'}

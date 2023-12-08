@@ -1,5 +1,5 @@
 import asyncio
-import json
+import importlib
 import logging
 import os.path
 import random
@@ -7,30 +7,18 @@ import re
 from copy import deepcopy
 from datetime import timedelta
 
-import aiogram
 import aiohttp
-from aiogram import Bot, Dispatcher, F, types
-from aiogram.filters import Command
-from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram import Bot, Dispatcher
 from tabulate import tabulate
 
 from config import *
-from utils import batched, format_time, load_from_file, replace_decl, save_to_file
+from utils import load_from_file, replace_decl, save_to_file
 
 bot = Bot(token=TELEGRAM_TOKEN)
 dispatcher = Dispatcher(disable_fsm=True)
 should_run = time_now().replace(hour=23, minute=0, second=0)
 if time_now() >= should_run:
     should_run += timedelta(days=1)
-filename = f'archive/{time_now().strftime("%m-%d")}'
-data = {}
-old_data = {}
-users = {}
-user_id_by_name = {}
-with open("chats.json", "r", encoding="utf-8") as file:
-    chats = json.load(file)
-    for key in chats:
-        chats[key] = set(chats[key])
 
 
 async def send_messages(changes):
@@ -54,28 +42,26 @@ async def send_messages(changes):
 
 
 async def load_standings():
-    global data, users
     async with aiohttp.ClientSession() as session:
         async with session.get(STANDING_PAGE) as response:
-            data = await response.json(encoding="utf-8")
+            CONFIG.data = await response.json(encoding="utf-8")
 
-    if users:
+    if CONFIG.users:
         return
-    for user_dict in data["users"]:
+    for user_dict in CONFIG.data["users"]:
         user_dict["id"] = str(user_dict["id"])
-        users[user_dict["id"]] = user_dict
-        user_id_by_name[user_dict["name"]] = user_dict["id"]
+        CONFIG.users[user_dict["id"]] = user_dict
+        CONFIG.user_id_by_name[user_dict["name"]] = user_dict["id"]
 
 
 async def job():
-    global old_data
     logging.info("Starting regular job")
     await load_standings()
-    contests = data["contests"]
+    contests = CONFIG.data["contests"]
 
-    old_contests = old_data["contests"]
-    if not os.path.exists(filename) or len(contests) != len(old_contests):
-        save_to_file(filename, data)
+    old_contests = CONFIG.old_data["contests"]
+    if not os.path.exists(CONFIG.filename) or len(contests) != len(old_contests):
+        save_to_file(CONFIG.filename, CONFIG.data)
         return
 
     tasks = []
@@ -95,14 +81,14 @@ async def job():
     index = 0
     for old_contest, new_contest in zip(old_contests, contests):
         changes = []
-        for user_id in users:
+        for user_id in CONFIG.users:
             for i, (old, new) in enumerate(zip(old_contest["users"][user_id], new_contest["users"][user_id])):
                 if old != new:
-                    changes.append((users[user_id], old, new, tasks[index + i], new["verdict"] == "OK" and total_solves[index + i] == 0))
+                    changes.append((CONFIG.users[user_id], old, new, tasks[index + i], new["verdict"] == "OK" and total_solves[index + i] == 0))
         index += len(new_contest["problems"])
         await send_messages(changes)
 
-    old_data = deepcopy(data)
+    CONFIG.old_data = deepcopy(CONFIG.data)
 
 
 def total_score_and_penalty(contests):
@@ -119,18 +105,18 @@ def total_score_and_penalty(contests):
 
 async def leaderboard():
     logging.info("Generating leaderboard")
-    old_data = load_from_file(filename)
+    old_data = load_from_file(CONFIG.filename)
     UPDATES = {
         "+": [],
         "-": []
     }
     old_stats = total_score_and_penalty(old_data["contests"])
-    new_stats = total_score_and_penalty(data["contests"])
+    new_stats = total_score_and_penalty(CONFIG.data["contests"])
 
-    for user_id in users:
+    for user_id in CONFIG.users:
         old_ok, old_penalty = old_stats[user_id]
         ok, penalty = new_stats[user_id]
-        full_name = users[user_id]["name"]
+        full_name = CONFIG.users[user_id]["name"]
         UPDATES["+"].append((ok - old_ok, ok, old_ok, full_name))
         UPDATES["-"].append((penalty - old_penalty, penalty, old_penalty, full_name))
     UPDATES["+"].sort(reverse=True)
@@ -146,204 +132,12 @@ async def leaderboard():
     await bot.send_message(CHAT_ID, result, parse_mode="markdown")
 
 
-@dispatcher.message(Command("fsolves"))
-async def first_solves(message: types.Message):
-    buttons = [
-        [types.KeyboardButton(text=text, callback_data=list(title_replacements).index(text)) for text in row]
-        for row in
-        batched(title_replacements.keys(), 2)
-    ]
-    keyboard = types.ReplyKeyboardMarkup(
-        keyboard=buttons,
-        resize_keyboard=True,
-        input_field_placeholder="Выберите контест"
-    )
-    await message.answer("Контест?", reply_markup=keyboard)
-
-
-@dispatcher.message(F.text.in_(title_replacements))
-async def show_first_solves(message: types.Message):
-    builder = InlineKeyboardBuilder()
-    contest, = (contest for contest in data["contests"] if contest["title"] == message.text)
-
-    for i in range(len(contest["problems"])):
-        builder.add(types.InlineKeyboardButton(
-            text=chr(ord("A") + i),
-            callback_data="!" + title_replacements[message.text] + ":" + chr(ord("A") + i))
-        )
-    await message.answer(
-        "Выберите задачу",
-        reply_markup=builder.as_markup()
-    )
-
-
-@dispatcher.callback_query(F.data.startswith("!"))
-async def show_first_callback(callback: types.CallbackQuery):
-    contest_title, task_l = callback.data[1:].split(":")
-    contest_title = reversed_title_replacements[contest_title]
-    contest, = (contest for contest in data["contests"] if contest["title"] == contest_title)
-    task = contest["problems"][ord(task_l) - ord("A")]
-    solves = []
-    for user_id in users:
-        result = contest["users"][user_id][ord(task_l) - ord("A")]
-        if result["verdict"] == "OK":
-            solves.append((result["time"], users[user_id]["name"]))
-    solves = sorted(solves)[:3]
-    while len(solves) < 3:
-        solves.append((-1, "-"))
-    solves = [
-        name + (f" ({format_time(time)})" if time > 0 else "")
-        for time, name in solves
-    ]
-    result_string = first_solves_message.format(first=solves[0], second=solves[1], third=solves[2], task=f"{contest_title} - {task_l} ({task['long']})")
-
-    builder = InlineKeyboardBuilder()
-    for i in range(len(contest["problems"])):
-        builder.add(types.InlineKeyboardButton(
-            text=chr(ord("A") + i),
-            callback_data="!" + title_replacements[contest_title] + ":" + chr(ord("A") + i))
-        )
-    try:
-        await callback.message.edit_text(result_string, reply_markup=builder.as_markup(), parse_mode="markdown")
-    except aiogram.exceptions.TelegramBadRequest:
-        return await callback.answer("Уже выбрана эта задача!")
-    await callback.answer()
-
-
-@dispatcher.message(Command("stats"))
-async def stats(message: types.Message):
-    msg = message.text.split(maxsplit=1)
-    if len(msg) == 1:
-        buttons = [
-            [types.InlineKeyboardButton(text=text, callback_data="?" + text) for text in row]
-            for row in
-            batched(reversed_title_replacements, 2)
-        ]
-        await message.answer(
-            "Выберите контест",
-            reply_markup=types.InlineKeyboardMarkup(inline_keyboard=buttons)
-        )
-    elif len(msg) == 2:
-        user_ids = [user_id for user_id in users if users[user_id]["name"] == msg[1]]
-        if not user_ids:
-            return message.answer("Человек с таким именем не найден.")
-
-        buttons = [
-            [types.InlineKeyboardButton(text=text, callback_data="*" + text + ":" + user_ids[0]) for text in row]
-            for row in
-            batched(reversed_title_replacements, 2)
-        ]
-        await message.answer(
-            "Выберите контест",
-            reply_markup=types.InlineKeyboardMarkup(inline_keyboard=buttons)
-        )
-
-
-@dispatcher.callback_query(F.data.startswith("?"))
-async def stats_callback(callback: types.CallbackQuery):
-    contest_title = callback.data[1:]
-    contest, = (contest for contest in data["contests"] if contest["title"] == reversed_title_replacements[contest_title])
-
-    headers = ("~ Задача", "Попыток", "Решавших", "Успешных", "% успешных", "% решивших")
-    align = ("left", "right", "right", "right", "right", "right")
-
-    table_data = []
-    for i in range(len(contest["problems"])):
-        current = [f"{contest['problems'][i]['short']}. {contest['problems'][i]['long']}", 0, 0, 0, None, None]
-        for user_id in users:
-            solve = contest["users"][user_id][i]
-            if solve["verdict"] is not None:
-                current[2] += 1
-            if solve["verdict"] == "OK":
-                current[3] += 1
-                current[1] += 1
-            current[1] += solve["penalty"]
-        if current[2] == 0:
-            current[4] = current[5] = "0.0%"
-        else:
-            current[4] = f"{current[3] / current[1] * 100:.2f}%"
-            current[5] = f"{current[3] / current[2] * 100:.2f}%"
-        table_data.append(current)
-    result_string = "```\n" + tabulate(table_data, headers, colalign=align) + "\n```"
-
-    buttons = [
-        [types.InlineKeyboardButton(text=text, callback_data="?" + text) for text in row]
-        for row in
-        batched(reversed_title_replacements, 2)
-    ]
-    try:
-        await callback.message.edit_text(result_string, reply_markup=types.InlineKeyboardMarkup(inline_keyboard=buttons), parse_mode="markdown")
-    except aiogram.exceptions.TelegramBadRequest:
-        return await callback.answer("Уже выбран этот контест!")
-    await callback.answer()
-
-
-@dispatcher.callback_query(F.data.startswith("*"))
-async def stats_callback(callback: types.CallbackQuery):
-    contest_title, user_id = callback.data[1:].split(":")
-    contest, = (contest for contest in data["contests"] if contest["title"] == reversed_title_replacements[contest_title])
-    solves = contest["users"][user_id]
-
-    headers = ("~ Задача", "Штраф", "Вердикт", "Время")
-    align = ("left", "right", "right", "right")
-
-    table_data = []
-    for i in range(len(contest["problems"])):
-        t = int(solves[i]["time"])
-        table_data.append((f"{contest['problems'][i]['short']}. {contest['problems'][i]['long']}", solves[i]["penalty"], solves[i]["verdict"], format_time(t)))
-    result_string = "```\n" + tabulate(table_data, headers, colalign=align) + "\n```"
-    buttons = [
-        [types.InlineKeyboardButton(text=text, callback_data="*" + text + ":" + user_id) for text in row]
-        for row in
-        batched(reversed_title_replacements, 2)
-    ]
-    try:
-        await callback.message.edit_text(result_string, reply_markup=types.InlineKeyboardMarkup(inline_keyboard=buttons), parse_mode="markdown")
-    except aiogram.exceptions.TelegramBadRequest:
-        return await callback.answer("Уже выбран этот контест!")
-    await callback.answer()
-
-
-@dispatcher.message(F.text.startswith("/add_users"))
-@dispatcher.channel_post(F.text.startswith("/add_users"))
-async def add_users(message: types.Message):
-    chat = chats.setdefault(message.chat.id, set())
-    good = []
-    for name in map(str.strip, message.text[message.text.find(" "):].split(",")):
-        if name in user_id_by_name and len(chat) <= 20:
-            chat.add(user_id_by_name[name])
-            good.append(name)
-    with open("chats.json", "w", encoding="utf-8") as file:
-        json.dump({key: list(value) for key, value in chats.items()}, file)
-    await message.answer(f"Успешно добавлены: {', '.join(good)}")
-
-
-@dispatcher.message(Command("remove_users"))
-@dispatcher.channel_post(F.text.startswith("/remove_users"))
-async def remove_users(message: types.Message):
-    chat = chats.setdefault(message.chat.id, set())
-    good = []
-    for name in map(str.strip, message.text[message.text.find(" "):].split(",")):
-        if user_id_by_name.get(name) in chat:
-            chat.remove(user_id_by_name[name])
-            good.append(name)
-    with open("chats.json", "w", encoding="utf-8") as file:
-        json.dump({key: list(value) for key, value in chats.items()}, file)
-    await message.answer(f"Успешно убраны: {', '.join(good)}")
-
-
-@dispatcher.message(Command("users_list"))
-@dispatcher.channel_post(F.text.startswith("/users_list"))
-async def users_list(message: types.Message):
-    await message.answer(f"Текущие добавленные: {', '.join((users[user_id]['name'] for user_id in chats.get(message.chat.id, tuple())))}")
-
-
 async def task(sleep_for):
-    global should_run, filename
+    global should_run
     while True:
         try:
             await asyncio.sleep(sleep_for)
-            filename = f'archive/{time_now().strftime("%m-%d")}'
+            CONFIG.filename = f'archive/{time_now().strftime("%m-%d")}'
             await job()
             if time_now() >= should_run:
                 await leaderboard()
@@ -353,13 +147,22 @@ async def task(sleep_for):
 
 
 async def main():
-    global old_data
     await load_standings()
-    old_data = deepcopy(data)
+    CONFIG.old_data = deepcopy(CONFIG.data)
     asyncio.create_task(task(40))
     await dispatcher.start_polling(bot)
 
 
+def load_routers():
+    for filename in os.listdir("commands"):
+        if filename.startswith("_"):
+            continue
+        router = getattr(importlib.import_module(f"commands.{filename[:-3]}"), "router")
+        dispatcher.include_router(router)
+        logging.info(f"Router `{filename}` has been loaded")
+
+
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format="%(levelname)s:%(module)s:%(message)s at %(asctime)s", datefmt='%H:%M:%S')
+    load_routers()
     asyncio.run(main())
