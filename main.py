@@ -31,7 +31,7 @@ async def send_messages(changes):
                 if is_first_solve:
                     await bot.send_message(CHAT_ID, first_solve_message.format(name=name, task=task), parse_mode="markdown")
 
-                for chat_id, users_to_send in chats.items():
+                for chat_id, users_to_send in CONFIG.chats.items():
                     if user["id"] in users_to_send:
                         await bot.send_message(chat_id, message, parse_mode="markdown")
                         if is_first_solve:
