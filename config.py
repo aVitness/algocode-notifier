@@ -23,9 +23,9 @@ class CONFIG:
 
 
 with open("chats.json", "r", encoding="utf-8") as file:
-    chats = json.load(file)
-    for key in chats:
-        chats[key] = set(chats[key])
+    CONFIG.chats = json.load(file)
+    for key in CONFIG.chats:
+        CONFIG.chats[key] = set(CONFIG.chats[key])
 
 female_names = {'Валентина', 'Алена', 'Елена', 'Ксения', 'Анастасия', 'Татьяна', 'Милана', 'Олеся', 'Виктория', 'Надежда', 'Юлия', 'Ярослава', 'София', 'Мария',
                 'Софья', 'Дарья', 'Алина', 'Валерия', 'Ирина', 'Арина', 'Елизавета'}
