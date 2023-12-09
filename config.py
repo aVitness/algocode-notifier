@@ -119,7 +119,10 @@ title_replacements = {
 }
 reversed_title_replacements = {value: key for key, value in title_replacements.items()}
 
-first_solve_message = "⚡ *{name}* стал первым, кто решил задачу *{task}*!"
+first_solve_message = [
+    "⚡ *{name}* стал первым, кто решил задачу *{task}*!",
+    "⚡ *{name}* стала первой, кто решил задачу *{task}*!"
+]
 
 first_solves_message = """Первые решившие задачу *{task}*:
 🥇{first}
