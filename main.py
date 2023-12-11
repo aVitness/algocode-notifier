@@ -19,6 +19,7 @@ dispatcher = Dispatcher(disable_fsm=True)
 should_run = time_now().replace(hour=23, minute=0, second=0)
 if time_now() >= should_run:
     should_run += timedelta(days=1)
+should_run_week = time_now().replace(hour=15, minute=55, second=0) + timedelta(days=(5 - time_now().weekday()) % 7)
 
 
 async def send_messages(changes):
@@ -103,9 +104,9 @@ def total_score_and_penalty(contests):
     return stats
 
 
-async def leaderboard():
+async def leaderboard(date):
     logging.info("Generating leaderboard")
-    old_data = load_from_file(CONFIG.filename)
+    old_data = load_from_file(f'archive/{"-".join(date.split(".")[::-1])}')
     UPDATES = {
         "+": [],
         "-": []
@@ -114,7 +115,7 @@ async def leaderboard():
     new_stats = total_score_and_penalty(CONFIG.data["contests"])
 
     for user_id in CONFIG.users:
-        old_ok, old_penalty = old_stats[user_id]
+        old_ok, old_penalty = old_stats.get(user_id, (0, 0))
         ok, penalty = new_stats[user_id]
         full_name = CONFIG.users[user_id]["name"]
         UPDATES["+"].append((ok - old_ok, ok, old_ok, full_name))
@@ -123,7 +124,8 @@ async def leaderboard():
     UPDATES["-"].sort(reverse=True)
     headers = ("*", "Имя", "Δ", "Было", "Стало")
 
-    date = datetime.now().strftime("%d.%m")
+    if date != time_now().strftime("%d.%m"):
+        date += f' - {time_now().strftime("%d.%m")}'
     table_data = ((i, x[3], x[0], x[2], x[1]) for i, x in enumerate(UPDATES["+"][:10], 1))
     result = f"Топ 10 по успешным посылкам за {date}\n" + "```\n" + tabulate(table_data, headers, tablefmt="psql") + "\n```"
     await bot.send_message(CHAT_ID, result, parse_mode="markdown")
@@ -133,15 +135,18 @@ async def leaderboard():
 
 
 async def task(sleep_for):
-    global should_run
+    global should_run, should_run_week
     while True:
         try:
             await asyncio.sleep(sleep_for)
             CONFIG.filename = f'archive/{time_now().strftime("%m-%d")}'
             await job()
             if time_now() >= should_run:
-                await leaderboard()
+                await leaderboard(time_now().strftime("%d.%m"))
                 should_run += timedelta(days=1)
+            if time_now() >= should_run_week:
+                await leaderboard((time_now() - timedelta(days=6)).strftime("%d.%m"))
+                should_run_week += timedelta(days=7)
         except Exception as e:
             logging.error(f"Got an error: {e}")
 
@@ -150,6 +155,7 @@ async def main():
     await load_standings()
     CONFIG.old_data = deepcopy(CONFIG.data)
     asyncio.create_task(task(40))
+    await bot.delete_webhook(drop_pending_updates=True)
     await dispatcher.start_polling(bot)
 
 
