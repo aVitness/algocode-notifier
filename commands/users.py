@@ -39,4 +39,4 @@ async def remove_users(message: types.Message):
 @router.message(Command("users_list"))
 @router.channel_post(F.text.startswith("/users_list"))
 async def users_list(message: types.Message):
-    await message.answer(f"Текущие добавленные: {', '.join((CONFIG.users[user_id]['name'] for user_id in CONFIG.chats.get(message.chat.id, tuple())))}")
+    await message.answer(f"Текущие добавленные: {', '.join((CONFIG.users[user_id]['name'] for user_id in CONFIG.chats.get(str(message.chat.id), tuple())))}")
