@@ -33,3 +33,15 @@ def format_time(seconds):
     h, m = divmod(seconds, 3600)
     m, s = divmod(m, 60)
     return f"{h}:{m:02}:{s:02}"
+
+
+def total_score_and_penalty(contests):
+    stats = {}
+    for contest in contests:
+        for user_id, solves in contest["users"].items():
+            if user_id not in stats:
+                stats[user_id] = [0, 0]
+            for result in solves:
+                stats[user_id][0] += int(result["score"])
+                stats[user_id][1] += result["penalty"]
+    return stats

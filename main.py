@@ -12,7 +12,7 @@ from aiogram import Bot, Dispatcher
 from tabulate import tabulate
 
 from config import *
-from utils import load_from_file, replace_decl, save_to_file
+from utils import *
 
 bot = Bot(token=TELEGRAM_TOKEN)
 dispatcher = Dispatcher(disable_fsm=True)
@@ -92,16 +92,6 @@ async def job():
     CONFIG.old_data = deepcopy(CONFIG.data)
 
 
-def total_score_and_penalty(contests):
-    stats = {}
-    for contest in contests:
-        for user_id, solves in contest["users"].items():
-            if user_id not in stats:
-                stats[user_id] = [0, 0]
-            for result in solves:
-                stats[user_id][0] += int(result["score"])
-                stats[user_id][1] += result["penalty"]
-    return stats
 
 
 async def leaderboard(date):

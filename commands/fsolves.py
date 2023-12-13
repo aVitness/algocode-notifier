@@ -55,7 +55,7 @@ async def show_first_callback(callback: types.CallbackQuery):
     while len(solves) < 3:
         solves.append((-1, "-"))
     solves = [
-        name + (f" ({format_time(time)})" if time > 0 else "")
+        name + (f" ({format_time(int(time))})" if time > 0 else "")
         for time, name in solves
     ]
     result_string = first_solves_message.format(first=solves[0], second=solves[1], third=solves[2], task=f"{contest_title} - {task_l} ({task['long']})")
