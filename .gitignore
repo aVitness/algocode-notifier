@@ -3,3 +3,4 @@
 venv
 chats.json
 .env
+logs

@@ -1,6 +1,6 @@
 import asyncio
 import importlib
-import logging
+from logs import logger
 import os.path
 import random
 import re
@@ -57,7 +57,7 @@ async def load_standings():
 
 
 async def job():
-    logging.info("Starting regular job")
+    logger.info("Starting regular job")
     await load_standings()
     contests = CONFIG.data["contests"]
 
@@ -81,6 +81,7 @@ async def job():
         index += len(contest["problems"])
 
     index = 0
+    _all_changes = []
     for old_contest, new_contest in zip(old_contests, contests):
         changes = []
         for user_id in CONFIG.users:
@@ -89,6 +90,9 @@ async def job():
                     changes.append((CONFIG.users[user_id], old, new, tasks[index + i], new["verdict"] == "OK" and total_solves[index + i] == 0))
         index += len(new_contest["problems"])
         await send_messages(changes)
+        if changes:
+            _all_changes.append(changes)
+    logger.debug(f"Found {sum(map(len, _all_changes))} changes: {_all_changes}")
 
     CONFIG.old_data = deepcopy(CONFIG.data)
 
@@ -96,7 +100,7 @@ async def job():
 
 
 async def leaderboard(date):
-    logging.info("Generating leaderboard")
+    logger.info("Generating leaderboard")
     old_data = load_from_file(f'archive/{"-".join(date.split(".")[::-1])}')
     UPDATES = {
         "+": [],
@@ -139,7 +143,7 @@ async def task(sleep_for):
                 await leaderboard((time_now() - timedelta(days=6)).strftime("%d.%m"))
                 should_run_week += timedelta(days=7)
         except Exception as e:
-            logging.error(f"Got an error: {e}")
+            logger.error(f"Got an error: {e}")
 
 
 async def main():
@@ -156,10 +160,9 @@ def load_routers():
             continue
         router = getattr(importlib.import_module(f"commands.{filename[:-3]}"), "router")
         dispatcher.include_router(router)
-        logging.info(f"Router `{filename}` has been loaded")
+        logger.info(f"Router `{filename}` has been loaded")
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s:%(module)s:%(message)s at %(asctime)s", datefmt='%H:%M:%S')
     load_routers()
     asyncio.run(main())
