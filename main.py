@@ -20,7 +20,8 @@ should_run = time_now().replace(hour=23, minute=0, second=0)
 if time_now() >= should_run:
     should_run += timedelta(days=1)
 should_run_week = time_now().replace(hour=15, minute=55, second=0) + timedelta(days=(5 - time_now().weekday()) % 7)
-
+if time_now() >= should_run_week:
+    should_run_week += timedelta(days=7)
 
 async def send_messages(changes):
     for user, old, new, task, is_first_solve in changes:
