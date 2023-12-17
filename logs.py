@@ -8,7 +8,7 @@ stdout_handler = logging.StreamHandler(sys.stdout)
 stdout_handler.setLevel(logging.INFO)
 stdout_handler.setFormatter(formatter)
 
-file_handler = logging.FileHandler('logs/logs.log', mode='a')
+file_handler = logging.FileHandler('logs/logs.log', mode='a', encoding="utf-8")
 file_handler.setLevel(logging.DEBUG)
 file_handler.setFormatter(formatter)
 
