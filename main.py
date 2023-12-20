@@ -1,6 +1,5 @@
 import asyncio
 import importlib
-from logs import logger
 import os.path
 import random
 import re
@@ -9,9 +8,9 @@ from datetime import timedelta
 
 import aiohttp
 from aiogram import Bot, Dispatcher
-from tabulate import tabulate
 
 from config import *
+from logs import logger
 from utils import *
 
 bot = Bot(token=TELEGRAM_TOKEN)
@@ -22,6 +21,7 @@ if time_now() >= should_run:
 should_run_week = time_now().replace(hour=15, minute=55, second=0) + timedelta(days=(5 - time_now().weekday()) % 7)
 if time_now() >= should_run_week:
     should_run_week += timedelta(days=7)
+
 
 async def send_messages(changes):
     for user, old, new, task, is_first_solve in changes:
@@ -97,36 +97,11 @@ async def job():
     CONFIG.old_data = deepcopy(CONFIG.data)
 
 
-
-
 async def leaderboard(date):
     logger.info("Generating leaderboard")
-    old_data = load_from_file(f'archive/{"-".join(date.split(".")[::-1])}')
-    UPDATES = {
-        "+": [],
-        "-": []
-    }
-    old_stats = total_score_and_penalty(old_data["contests"])
-    new_stats = total_score_and_penalty(CONFIG.data["contests"])
-
-    for user_id in CONFIG.users:
-        old_ok, old_penalty = old_stats.get(user_id, (0, 0))
-        ok, penalty = new_stats[user_id]
-        full_name = CONFIG.users[user_id]["name"]
-        UPDATES["+"].append((ok - old_ok, ok, old_ok, full_name))
-        UPDATES["-"].append((penalty - old_penalty, penalty, old_penalty, full_name))
-    UPDATES["+"].sort(reverse=True)
-    UPDATES["-"].sort(reverse=True)
-    headers = ("*", "Имя", "Δ", "Было", "Стало")
-
-    if date != time_now().strftime("%d.%m"):
-        date += f' - {time_now().strftime("%d.%m")}'
-    table_data = ((i, x[3], x[0], x[2], x[1]) for i, x in enumerate(UPDATES["+"][:10], 1))
-    result = f"Топ 10 по успешным посылкам за {date}\n" + "```\n" + tabulate(table_data, headers, tablefmt="psql") + "\n```"
-    await bot.send_message(CHAT_ID, result, parse_mode="markdown")
-    table_data = ((i, x[3], x[0], x[2], x[1]) for i, x in enumerate(UPDATES["-"][:10], 1))
-    result = f"Топ 10 по штрафам за {date}\n" + "```\n" + tabulate(table_data, headers, tablefmt="psql") + "\n```"
-    await bot.send_message(CHAT_ID, result, parse_mode="markdown")
+    score_table, penalty_table = generate_leaderboard(date)
+    await bot.send_message(CHAT_ID, score_table, parse_mode="markdown")
+    await bot.send_message(CHAT_ID, penalty_table, parse_mode="markdown")
 
 
 async def task(sleep_for):
