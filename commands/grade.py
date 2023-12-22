@@ -27,6 +27,7 @@ async def generate():
 
         async with session.get("https://algocode.ru/standings_data/region2023/") as response:
             region_table = await response.json(encoding="utf-8")
+            region_users = {str(user["id"]): user for user in region_table["users"]}
             region_table = region_table["contests"]
             total_dists = len(region_table)
     result = {user_id: {"solved_thematic": 0, "solved_dists": [0] * total_dists} for user_id in CONFIG.users}
@@ -42,9 +43,10 @@ async def generate():
     for i, contest in enumerate(region_table):
         for user_id, contest_result in contest["users"].items():
             if user_id not in CONFIG.users:
-                continue
-            for task_result in contest_result:
-                result[user_id]["solved_dists"][i] += task_result["score"]
+                if region_users[user_id]["name"] not in CONFIG.user_id_by_name:
+                    continue
+                user_id = CONFIG.user_id_by_name[region_users[user_id]["name"]]
+            result[user_id]["solved_dists"][i] = max(result[user_id]["solved_dists"][i], sum(task_result["score"] for task_result in contest_result))
 
     for user_result in result.values():
         user_result["score_dists"] = sum(
@@ -80,7 +82,8 @@ def keyboard(prefix, page):
 def generate_table(page):
     if page < 0 or 15 * page >= len(result):
         return
-    return [(place, CONFIG.users[user_id]["name"], f'{result[user_id]["score"]:.2f}', f'{result[user_id]["score_thematic"]:.2f}', f'{result[user_id]["score_dists"]:.2f}') for
+    return [(place, CONFIG.users[user_id]["name"], f'{result[user_id]["score"]:.2f}', f'{result[user_id]["score_thematic"]:.2f}',
+             f'{result[user_id]["score_dists"]:.2f}') for
             place, user_id in
             enumerate(tuple(result)[page * 15:(page + 1) * 15], start=page * 15 + 1)]
 
