@@ -7,6 +7,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from tabulate import tabulate
 
 from config import CONFIG
+from utils import take_page
 
 router = Router()
 
@@ -101,11 +102,14 @@ async def grade(message: types.Message):
     headers = ("*", "Имя", "Оценка", "Темтуры", "Дистуры")
     align = ("right", "left", "right", "right", "right")
     result_message = f"Топ по оценкам, страница 1\n" + "```\n" + tabulate(table_data, headers, tablefmt="psql", colalign=align) + "\n```"
-    await message.answer(result_message, parse_mode="markdown", reply_markup=keyboard("gt", 0))
+    msg = await message.answer(result_message, parse_mode="markdown", reply_markup=keyboard("gt", 0))
+    CONFIG.page_authors[msg.message_id] = (message.from_user.id, int(time.time()))
 
 
 @router.callback_query(F.data.startswith("gt"))
-async def penalty_top_callback(callback: types.CallbackQuery):
+async def grade_callback(callback: types.CallbackQuery):
+    if not take_page(callback):
+        return await callback.answer("Эта таблица занята другим пользователем")
     page = int(callback.data[2:])
     table_data = generate_table(page)
     if table_data is None:
