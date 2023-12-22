@@ -1,6 +1,6 @@
 import json
 from itertools import islice
-
+from aiogram import types
 from tabulate import tabulate
 
 from config import CONFIG, time_now
@@ -77,3 +77,8 @@ def generate_leaderboard(date):
     table_data = ((i, x[3], x[0], x[2], x[1]) for i, x in enumerate(UPDATES["-"][:10], 1))
     penalty_result = f"Топ 10 по штрафам за {date}\n" + "```\n" + tabulate(table_data, headers, tablefmt="psql") + "\n```"
     return score_result, penalty_result
+
+
+async def is_admin(message: types.Message):
+    chat_member = await message.bot.get_chat_member(message.chat.id, message.from_user.id)
+    return chat_member.status in ('creator', 'administrator')
