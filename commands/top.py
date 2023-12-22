@@ -6,7 +6,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from tabulate import tabulate
 
 from config import CONFIG
-from utils import total_score_and_penalty
+from utils import total_score_and_penalty, take_page
 
 router = Router()
 
@@ -23,7 +23,8 @@ def generate(page, target):
         last_update = time.time()
     if page < 0 or 15 * page >= len(scores):
         return
-    return [(place, CONFIG.users[user_id]["name"], scores[user_id][target]) for place, user_id in enumerate(stats[target][page * 15:(page + 1) * 15], start=page * 15 + 1)]
+    return [(place, CONFIG.users[user_id]["name"], scores[user_id][target]) for place, user_id in
+            enumerate(stats[target][page * 15:(page + 1) * 15], start=page * 15 + 1)]
 
 
 def keyboard(prefix, page):
@@ -52,11 +53,14 @@ async def penalty_top(message: types.Message):
     table_data = generate(0, 1)
     headers = ("*", "Имя", "Штраф")
     result = f"Топ по штрафам, страница 1\n" + "```\n" + tabulate(table_data, headers, tablefmt="psql") + "\n```"
-    await message.answer(result, parse_mode="markdown", reply_markup=keyboard("pt", 0))
+    msg = await message.answer(result, parse_mode="markdown", reply_markup=keyboard("pt", 0))
+    CONFIG.page_authors[msg.message_id] = (message.from_user.id, int(time.time()))
 
 
 @router.callback_query(F.data.startswith("pt"))
 async def penalty_top_callback(callback: types.CallbackQuery):
+    if not take_page(callback):
+        return await callback.answer("Эта таблица занята другим пользователем")
     page = int(callback.data[2:])
     table_data = generate(page, 1)
     if table_data is None:
@@ -68,15 +72,18 @@ async def penalty_top_callback(callback: types.CallbackQuery):
 
 
 @router.message(Command("score_top"))
-async def penalty_top(message: types.Message):
+async def score_top(message: types.Message):
     table_data = generate(0, 0)
     headers = ("*", "Имя", "Решено")
     result = f"Топ по успешным посылкам, страница 1\n" + "```\n" + tabulate(table_data, headers, tablefmt="psql") + "\n```"
-    await message.answer(result, parse_mode="markdown", reply_markup=keyboard("st", 0))
+    msg = await message.answer(result, parse_mode="markdown", reply_markup=keyboard("st", 0))
+    CONFIG.page_authors[msg.message_id] = (message.from_user.id, int(time.time()))
 
 
 @router.callback_query(F.data.startswith("st"))
-async def penalty_top_callback(callback: types.CallbackQuery):
+async def score_top_callback(callback: types.CallbackQuery):
+    if not take_page(callback):
+        return await callback.answer("Эта таблица занята другим пользователем")
     page = int(callback.data[2:])
     table_data = generate(page, 0)
     if table_data is None:

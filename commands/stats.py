@@ -4,7 +4,7 @@ from aiogram.filters import Command
 from tabulate import tabulate
 
 from config import CONFIG, reversed_title_replacements
-from utils import batched, format_time
+from utils import batched, format_time, take_page
 
 router = Router()
 
@@ -40,6 +40,8 @@ async def stats(message: types.Message):
 
 @router.callback_query(F.data.startswith("?"))
 async def stats_callback(callback: types.CallbackQuery):
+    if not take_page(callback):
+        return await callback.answer("Эта таблица занята другим пользователем")
     contest_title = callback.data[1:]
     contest, = (contest for contest in CONFIG.data["contests"] if contest["title"] == reversed_title_replacements[contest_title])
 
@@ -79,6 +81,8 @@ async def stats_callback(callback: types.CallbackQuery):
 
 @router.callback_query(F.data.startswith("*"))
 async def stats_callback(callback: types.CallbackQuery):
+    if not take_page(callback):
+        return await callback.answer("Эта таблица занята другим пользователем")
     contest_title, user_id = callback.data[1:].split(":")
     contest, = (contest for contest in CONFIG.data["contests"] if contest["title"] == reversed_title_replacements[contest_title])
     solves = contest["users"][user_id]

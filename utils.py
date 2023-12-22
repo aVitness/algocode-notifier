@@ -1,5 +1,7 @@
 import json
+import time
 from itertools import islice
+
 from aiogram import types
 from tabulate import tabulate
 
@@ -82,3 +84,12 @@ def generate_leaderboard(date):
 async def is_admin(message: types.Message):
     chat_member = await message.bot.get_chat_member(message.chat.id, message.from_user.id)
     return chat_member.status in ('creator', 'administrator')
+
+
+def take_page(callback: types.CallbackQuery):
+    current_time = int(time.time())
+    user, last_used = CONFIG.page_authors.get(callback.message.message_id, (None, 0))
+    if user == callback.from_user.id or current_time - last_used >= 60:
+        CONFIG.page_authors[callback.message.message_id] = (callback.from_user.id, current_time)
+        return True
+    return False

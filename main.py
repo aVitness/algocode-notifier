@@ -104,6 +104,11 @@ async def leaderboard(date):
     await bot.send_message(CHAT_ID, penalty_table, parse_mode="markdown")
 
 
+def clear_old_pages():
+    current_time = time.time()
+    CONFIG.page_authors = {key: value for key, value in CONFIG.page_authors.items() if current_time - value[1] < 60}
+
+
 async def task(sleep_for):
     global should_run, should_run_week
     while True:
@@ -117,6 +122,7 @@ async def task(sleep_for):
             if time_now() >= should_run_week:
                 await leaderboard((time_now() - timedelta(days=6)).strftime("%d.%m"))
                 should_run_week += timedelta(days=7)
+            clear_old_pages()
         except Exception as e:
             logger.error(f"Got an error: {e}")
 

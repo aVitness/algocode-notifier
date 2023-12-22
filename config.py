@@ -20,6 +20,7 @@ class CONFIG:
     users = {}
     user_id_by_name = {}
     chats = {}
+    page_authors = {}
 
 
 with open("chats.json", "r", encoding="utf-8") as file:

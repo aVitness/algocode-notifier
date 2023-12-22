@@ -4,7 +4,7 @@ from aiogram.filters import Command
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from config import CONFIG, first_solves_message, reversed_title_replacements, title_replacements
-from utils import batched, format_time
+from utils import batched, format_time, take_page
 
 router = Router()
 
@@ -42,6 +42,8 @@ async def show_first_solves(message: types.Message):
 
 @router.callback_query(F.data.startswith("!"))
 async def show_first_callback(callback: types.CallbackQuery):
+    if not take_page(callback):
+        return await callback.answer("Эта таблица занята другим пользователем")
     contest_title, task_l = callback.data[1:].split(":")
     contest_title = reversed_title_replacements[contest_title]
     contest, = (contest for contest in CONFIG.data["contests"] if contest["title"] == contest_title)
