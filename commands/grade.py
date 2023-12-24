@@ -77,8 +77,8 @@ async def generate():
             min(12, 10 * x / 300) for x in user_result["solved_dists"]
         ) / total_dists
         user_result["score_thematic"] = 12 * user_result["solved_thematic"] / total_tasks
-        user_result["score_test"] = 10 * user_result["solved_test"] / total_test_tasks / 3
-        user_result["score_blitz"] = 20 * user_result["solved_blitz"] / total_blitz_tasks / 3
+        user_result["score_test"] = max(user_result["solved_test"] / 15 * 10, user_result["solved_test"] - 2) / 3
+        user_result["score_blitz"] = 20 * user_result["solved_blitz"] / 9 / 3
         user_result["score_s"] = user_result["score_test"] + user_result["score_blitz"]
         user_result["score"] = min(10, 0.5 * user_result["score_thematic"] + 0.2 * user_result["score_dists"] + 0.3 * user_result["score_s"])
 
