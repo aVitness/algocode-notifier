@@ -35,11 +35,13 @@ async def send_messages(changes):
 
                 for chat_id, users_to_send in CONFIG.chats.items():
                     if user["id"] in users_to_send:
-                        await bot.send_message(chat_id, message, parse_mode="markdown")
-                        if is_first_solve:
-                            await bot.send_message(chat_id, first_solve_message[name in female_names].format(name=name, task=task), parse_mode="markdown")
-                        await asyncio.sleep(0.1)
-
+                        try:
+                            await bot.send_message(chat_id, message, parse_mode="markdown")
+                            if is_first_solve:
+                                await bot.send_message(chat_id, first_solve_message[name in female_names].format(name=name, task=task), parse_mode="markdown")
+                            await asyncio.sleep(0.1)
+                        except Exception as e:
+                            logger.error(f"Got an error while sending messages: {e}")
                 break
 
 
