@@ -29,9 +29,12 @@ async def send_messages(changes):
         for patterns, messages_list in messages[name in female_names]:
             if all(re.fullmatch(patterns[key], str(new[key])) for key in patterns):
                 message = replace_decl(random.choice(messages_list).format(name=user["name"], task=task, penalty=new["penalty"], verdict=new["verdict"]))
-                await bot.send_message(CHAT_ID, message, parse_mode="markdown")
-                if is_first_solve:
-                    await bot.send_message(CHAT_ID, first_solve_message[name in female_names].format(name=name, task=task), parse_mode="markdown")
+                try:
+                    await bot.send_message(CHAT_ID, message, parse_mode="markdown")
+                    if is_first_solve:
+                        await bot.send_message(CHAT_ID, first_solve_message[name in female_names].format(name=name, task=task), parse_mode="markdown")
+                except Exception as e:
+                    logger.error(f"Got an error while sending main message: {e}")
 
                 for chat_id, users_to_send in CONFIG.chats.items():
                     if user["id"] in users_to_send:
