@@ -50,6 +50,8 @@ async def show_first_callback(callback: types.CallbackQuery):
     task = contest["problems"][ord(task_l) - ord("A")]
     solves = []
     for user_id in CONFIG.users:
+        if user_id not in contest["users"]:
+            continue
         result = contest["users"][user_id][ord(task_l) - ord("A")]
         if result["verdict"] == "OK":
             solves.append((result["time"], CONFIG.users[user_id]["name"]))

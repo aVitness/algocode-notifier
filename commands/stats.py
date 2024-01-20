@@ -52,6 +52,8 @@ async def stats_callback(callback: types.CallbackQuery):
     for i in range(len(contest["problems"])):
         current = [f"{contest['problems'][i]['short']}. {contest['problems'][i]['long']}", 0, 0, 0, None, None]
         for user_id in CONFIG.users:
+            if user_id not in contest["users"]:
+                continue
             solve = contest["users"][user_id][i]
             if solve["verdict"] is not None:
                 current[2] += 1

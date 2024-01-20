@@ -7,10 +7,12 @@ from pytz import timezone
 
 load_dotenv()
 
-CHAT_ID = "@yandex_b_notifications"
+CHAT_ID = 727312887 # "@yandex_b_notifications"
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-# STANDING_PAGE = "https://algocode.ru/standings_data/b_fall_2023/"
-STANDING_PAGE = "https://algocode.ru/standings_data/b_spring_2024/"
+STANDINGS_PAGES = [
+    "https://algocode.ru/standings_data/b_fall_2023/",
+    "https://algocode.ru/standings_data/b_spring_2024/"
+]
 time_now = lambda: datetime.now(tz=timezone("Europe/Moscow"))
 
 
@@ -116,6 +118,7 @@ messages = [
 ]
 
 title_replacements = {
+    'Корневая декомпозиция': 'Корнячка',
     'Графы 4': 'Графы 4',
     'Геометрия 1': 'Геометрия 1',
     'Графы 3': 'Графы 3',
@@ -132,9 +135,7 @@ title_replacements = {
     'Строки 1': 'Строки 1',
     'Графы 1': 'Графы 1'
 }
-title_replacements = {
-    'Корневая декомпозиция': 'Корнячка',
-}
+
 reversed_title_replacements = {value: key for key, value in title_replacements.items()}
 
 first_solve_message = [
