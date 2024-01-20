@@ -9,7 +9,8 @@ load_dotenv()
 
 CHAT_ID = "@yandex_b_notifications"
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-STANDING_PAGE = "https://algocode.ru/standings_data/b_fall_2023/"
+# STANDING_PAGE = "https://algocode.ru/standings_data/b_fall_2023/"
+STANDING_PAGE = "https://algocode.ru/standings_data/b_spring_2024/"
 time_now = lambda: datetime.now(tz=timezone("Europe/Moscow"))
 
 
@@ -130,6 +131,9 @@ title_replacements = {
     'Строки 2': 'Строки 2',
     'Строки 1': 'Строки 1',
     'Графы 1': 'Графы 1'
+}
+title_replacements = {
+    'Корневая декомпозиция': 'Корнячка',
 }
 reversed_title_replacements = {value: key for key, value in title_replacements.items()}
 

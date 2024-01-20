@@ -5,9 +5,12 @@ import random
 import re
 from copy import deepcopy
 from datetime import timedelta
+from io import BytesIO
 
 import aiohttp
 from aiogram import Bot, Dispatcher
+from aiogram.types import BufferedInputFile
+from PIL import Image, ImageDraw, ImageFont
 
 from config import *
 from logs import logger
@@ -21,6 +24,7 @@ if time_now() >= should_run:
 should_run_week = time_now().replace(hour=15, minute=55, second=0) + timedelta(days=(5 - time_now().weekday()) % 7)
 if time_now() >= should_run_week:
     should_run_week += timedelta(days=7)
+next_region = time_now() + timedelta(minutes=random.randint(90, 300))
 
 
 async def send_messages(changes):
@@ -114,8 +118,55 @@ def clear_old_pages():
     CONFIG.page_authors = {key: value for key, value in CONFIG.page_authors.items() if current_time - value[1] < 60}
 
 
+def fix(n, texts):
+    if 11 <= n <= 14:
+        return texts[2]
+    if n % 10 == 1:
+        return texts[0]
+    if 1 < n % 10 < 5:
+        return texts[1]
+    return texts[2]
+
+
+async def region_countdown():
+    target_time = timezone("Europe/Moscow").localize(datetime(2024, 1, 20, 10, 0, 0))
+    current_time = time_now()
+    diff = target_time - current_time
+    hours, seconds = divmod(diff.seconds, 3600)
+    minutes, seconds = divmod(seconds, 60)
+    image_type = random.randint(1, 3)
+
+    img = Image.new(mode="RGB", size=(1280, 720))
+    draw = ImageDraw.Draw(img)
+    if image_type == 1:
+        font = ImageFont.truetype('temp/font.ttf', 81)
+        font_smaller = ImageFont.truetype('temp/font.ttf', 57)
+    if image_type == 2:
+        font = ImageFont.truetype('temp/rainfont.ttf', 96)
+        font_smaller = ImageFont.truetype('temp/rainfont.ttf', 72)
+    if image_type == 3:
+        font = ImageFont.truetype('temp/NinaCTT.ttf', 81)
+        font_smaller = ImageFont.truetype('temp/NinaCTT.ttf', 57)
+
+    draw.text((1280 // 2, 720 // 2 - 100), f"До региона осталось", fill="white", font=font, anchor="mm")
+    # draw.text((1280 // 2, 720 // 2), f"{diff.days} {fix(diff.days, ('день', 'дня', 'дней'))}", fill="white", font=font, anchor="mm")
+    draw.text((1280 // 2, 720 // 2 + 50), f"{hours} {fix(hours, ('час', 'часа', 'часов'))} {minutes} {fix(minutes, ('минута', 'минуты', 'минут'))}",
+              fill="white", font=font, anchor="mm")
+    if image_type == 2:
+        filter = Image.open("temp/filter.png").resize((1280, 720)).convert("RGBA")
+        filter.putalpha(45)
+        img.paste(filter, (0, 0), filter)
+    if image_type == 3:
+        filter = Image.open("temp/image.png").resize((1280, 720)).convert("RGBA")
+        filter.putalpha(93)
+        img.paste(filter, (0, 0), filter)
+    bytes = BytesIO()
+    img.save(bytes, format="png")
+    await bot.send_photo(CHAT_ID, photo=BufferedInputFile(bytes.getvalue(), "region_countdown.png"))
+
+
 async def task(sleep_for):
-    global should_run, should_run_week
+    global should_run, should_run_week, next_region
     while True:
         try:
             await asyncio.sleep(sleep_for)
@@ -127,6 +178,9 @@ async def task(sleep_for):
             if time_now() >= should_run_week:
                 await leaderboard((time_now() - timedelta(days=6)).strftime("%d.%m"))
                 should_run_week += timedelta(days=7)
+            if time_now() >= next_region:
+                await region_countdown()
+                next_region += timedelta(minutes=random.randint(90, 300))
             clear_old_pages()
         except Exception as e:
             logger.error(f"Got an error: {e}")
