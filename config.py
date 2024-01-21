@@ -7,7 +7,7 @@ from pytz import timezone
 
 load_dotenv()
 
-CHAT_ID = 727312887 # "@yandex_b_notifications"
+CHAT_ID = "@yandex_b_notifications"
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 STANDINGS_PAGES = [
     "https://algocode.ru/standings_data/b_fall_2023/",
