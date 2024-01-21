@@ -12,29 +12,28 @@ router = Router()
 @router.message(Command("fsolves"))
 async def first_solves(message: types.Message):
     buttons = [
-        [types.KeyboardButton(text=text, callback_data=list(title_replacements).index(text)) for text in row]
+        [types.InlineKeyboardButton(text=text, callback_data="#" + text) for text in row]
         for row in
-        batched(title_replacements.keys(), 2)
+        batched(reversed_title_replacements, 2)
     ]
-    keyboard = types.ReplyKeyboardMarkup(
-        keyboard=buttons,
-        resize_keyboard=True,
-        input_field_placeholder="Выберите контест"
+    await message.answer(
+        "Выберите контест",
+        reply_markup=types.InlineKeyboardMarkup(inline_keyboard=buttons)
     )
-    await message.answer("Контест?", reply_markup=keyboard)
 
 
-@router.message(F.text.in_(title_replacements))
-async def show_first_solves(message: types.Message):
+@router.callback_query(F.data.startswith("#"))
+async def show_first_solves(callback: types.CallbackQuery):
     builder = InlineKeyboardBuilder()
-    contest, = (contest for contest in CONFIG.data["contests"] if contest["title"] == message.text)
+    contest_title = callback.data[1:]
+    contest, = (contest for contest in CONFIG.data["contests"] if contest["title"] == reversed_title_replacements[contest_title])
 
     for i in range(len(contest["problems"])):
         builder.add(types.InlineKeyboardButton(
             text=chr(ord("A") + i),
-            callback_data="!" + title_replacements[message.text] + ":" + chr(ord("A") + i))
+            callback_data="!" + contest_title + ":" + chr(ord("A") + i))
         )
-    await message.answer(
+    await callback.message.edit_text(
         "Выберите задачу",
         reply_markup=builder.as_markup()
     )
