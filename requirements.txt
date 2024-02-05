@@ -3,3 +3,4 @@ aiogram
 tabulate
 pytz
 python-dotenv
+matplotlib
