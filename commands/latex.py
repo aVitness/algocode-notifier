@@ -9,7 +9,9 @@ router = Router()
 
 
 @router.message(Command("tex"))
-async def latex(message: types.Message):
+async def tex(message: types.Message):
+    if not message.text[5:].strip():
+        return
     fig = plt.figure()
     text = fig.text(0, 0, "$" + message.text[5:].replace('\n', "$\n$") + "$")
     dpi = 300
