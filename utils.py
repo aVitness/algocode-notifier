@@ -1,11 +1,24 @@
 import json
+import re
 import time
 from itertools import islice
 
+import pymorphy3
 from aiogram import types
+from pytrovich.detector import PetrovichGenderDetector
+from pytrovich.enums import Case
+from pytrovich.maker import PetrovichDeclinationMaker
 from tabulate import tabulate
 
 from config import CONFIG, time_now
+
+detector = PetrovichGenderDetector()
+morph = pymorphy3.MorphAnalyzer()
+gender_regex = re.compile(r"\[([^\[\]]+)\]")
+number_regex = re.compile(r"%([^%]+)%")
+case_regex = re.compile(r"@([^@]+)@")
+maker = PetrovichDeclinationMaker()
+case_translations = {"gent": Case.GENITIVE, "datv": Case.DATIVE, "accs": Case.ACCUSATIVE, "ablt": Case.INSTRUMENTAL, "loct": Case.PREPOSITIONAL}
 
 
 def batched(iterable, n):
@@ -25,12 +38,6 @@ def load_from_file(filename):
 def save_to_file(filename, data):
     with open(filename, "w", encoding="utf-8") as file:
         json.dump(data, file, ensure_ascii=False)
-
-
-def replace_decl(s):
-    for x, repl in ((" 1 неверных посылок", " 1 неверной посылки"), (" 1 попытками", " 1 попыткой"), (" 1 попыток", " 1 попытки"), (" 1 ошибки", " 1 ошибку")):
-        s = s.replace(x, repl)
-    return s
 
 
 def format_time(seconds):

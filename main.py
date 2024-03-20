@@ -1,18 +1,19 @@
 import asyncio
 import importlib
+import logging
 import os.path
 import random
-import re
 from copy import deepcopy
 from datetime import timedelta
-import logging
-
+from pytrovich.enums import NamePart, Gender
 import aiohttp
 from aiogram import Bot, Dispatcher
 
 from config import *
 from utils import *
 
+logging.basicConfig(level=logging.INFO)
+morph = pymorphy3.MorphAnalyzer()
 bot = Bot(token=TELEGRAM_TOKEN)
 dispatcher = Dispatcher(disable_fsm=True)
 should_run = time_now().replace(hour=23, minute=0, second=0)
@@ -23,17 +24,42 @@ if time_now() >= should_run_week:
     should_run_week += timedelta(days=7)
 
 
+def fix_number(match):
+    number, word, case = match[1].split()
+    return f"{number} {morph.parse(word)[0].inflect({case}).make_agree_with_number(int(number)).word}"
+
+
+def fix_case(match):
+    surname, name, case = match[1].split()
+    case = case_translations[case]
+
+    gender = detector.detect(firstname=name, lastname=surname)
+    name = maker.make(NamePart.FIRSTNAME, gender, case, name)
+    surname = maker.make(NamePart.LASTNAME, gender, case, surname)
+    return f"{surname} {name}"
+
+
 async def send_messages(changes):
     for user, old, new, task, is_first_solve in changes:
-        name = user["name"].split()[1]
-        for patterns, messages_list in messages[name in female_names]:
+        name, surname = user["name"].split()
+        for patterns, messages_list in messages:
             if all(re.fullmatch(patterns[key], str(new[key])) for key in patterns):
-                message = replace_decl(random.choice(messages_list).format(name=user["name"], task=task, penalty=new["penalty"], verdict=new["verdict"]))
+                is_female = detector.detect(firstname=name, lastname=surname) == Gender.FEMALE
+                message = random.choice(messages_list).format(name=user["name"], task=task, penalty=new["penalty"], verdict=new["verdict"])
+                message = gender_regex.sub(lambda match: match[1].split("/")[is_female], message)
+                message = number_regex.sub(fix_number, message)
+                message = case_regex.sub(fix_case, message)
+
                 try:
                     await bot.send_message(CHAT_ID, message, parse_mode="markdown")
                     if is_first_solve:
-                        await bot.send_message(CHAT_ID, first_solve_message[name in female_names].format(name=name, task=task), parse_mode="markdown")
+                        await bot.send_message(
+                            CHAT_ID,
+                            gender_regex.sub(lambda match: match[1].split("/")[is_female], first_solve_message.format(name=name, task=task)),
+                            parse_mode="markdown"
+                        )
                 except Exception as e:
+                    # TODO: make a queue for sending again instead
                     logging.error(f"Got an error while sending main message: {e}")
                 break
 
@@ -108,16 +134,6 @@ async def leaderboard(date):
 def clear_old_pages():
     current_time = time.time()
     CONFIG.page_authors = {key: value for key, value in CONFIG.page_authors.items() if current_time - value[1] < 60}
-
-
-def fix(n, texts):
-    if 11 <= n <= 14:
-        return texts[2]
-    if n % 10 == 1:
-        return texts[0]
-    if 1 < n % 10 < 5:
-        return texts[1]
-    return texts[2]
 
 
 async def task(sleep_for):

@@ -3,4 +3,4 @@ aiogram
 tabulate
 pytz
 python-dotenv
-matplotlib
+pymorphy3
