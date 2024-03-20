@@ -24,8 +24,8 @@ class CONFIG:
     user_id_by_name = {}
     page_authors = {}
 
-female_names = {'Валентина', 'Алена', 'Елена', 'Ксения', 'Анастасия', 'Татьяна', 'Милана', 'Олеся', 'Виктория', 'Надежда', 'Юлия', 'Ярослава', 'София', 'Мария',
-                'Софья', 'Дарья', 'Алина', 'Валерия', 'Ирина', 'Арина', 'Елизавета'}
+with open(f"data/female_names_rus.txt", encoding="utf-8") as file:
+    female_names = set(file.read().split())
 
 messages = [
     [
