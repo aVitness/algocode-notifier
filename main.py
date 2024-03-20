@@ -5,12 +5,12 @@ import random
 import re
 from copy import deepcopy
 from datetime import timedelta
+import logging
 
 import aiohttp
 from aiogram import Bot, Dispatcher
 
 from config import *
-from logs import logger
 from utils import *
 
 bot = Bot(token=TELEGRAM_TOKEN)
@@ -34,17 +34,7 @@ async def send_messages(changes):
                     if is_first_solve:
                         await bot.send_message(CHAT_ID, first_solve_message[name in female_names].format(name=name, task=task), parse_mode="markdown")
                 except Exception as e:
-                    logger.error(f"Got an error while sending main message: {e}")
-
-                for chat_id, users_to_send in CONFIG.chats.items():
-                    if user["id"] in users_to_send:
-                        try:
-                            await bot.send_message(chat_id, message, parse_mode="markdown")
-                            if is_first_solve:
-                                await bot.send_message(chat_id, first_solve_message[name in female_names].format(name=name, task=task), parse_mode="markdown")
-                            await asyncio.sleep(0.1)
-                        except Exception as e:
-                            logger.error(f"Got an error while sending messages: {e}")
+                    logging.error(f"Got an error while sending main message: {e}")
                 break
 
 
@@ -68,7 +58,7 @@ async def load_standings():
 
 
 async def job():
-    logger.info("Starting regular job")
+    logging.info("Starting regular job")
     await load_standings()
     contests = CONFIG.data["contests"]
 
@@ -103,13 +93,13 @@ async def job():
         await send_messages(changes)
         if changes:
             _all_changes.append(changes)
-    logger.debug(f"Found {sum(map(len, _all_changes))} changes: {_all_changes}")
+    logging.debug(f"Found {sum(map(len, _all_changes))} changes: {_all_changes}")
 
     CONFIG.old_data = deepcopy(CONFIG.data)
 
 
 async def leaderboard(date):
-    logger.info("Generating leaderboard")
+    logging.info("Generating leaderboard")
     score_table, penalty_table = generate_leaderboard(date)
     await bot.send_message(CHAT_ID, score_table, parse_mode="markdown")
     await bot.send_message(CHAT_ID, penalty_table, parse_mode="markdown")
@@ -145,7 +135,7 @@ async def task(sleep_for):
                 should_run_week += timedelta(days=7)
             clear_old_pages()
         except Exception as e:
-            logger.error(f"Got an error: {e}")
+            logging.error(f"Got an error: {e}")
 
 
 async def main():
@@ -162,7 +152,7 @@ def load_routers():
             continue
         router = getattr(importlib.import_module(f"commands.{filename[:-3]}"), "router")
         dispatcher.include_router(router)
-        logger.info(f"Router `{filename}` has been loaded")
+        logging.info(f"Router `{filename}` has been loaded")
 
 
 if __name__ == '__main__':
