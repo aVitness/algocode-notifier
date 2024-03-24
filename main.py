@@ -33,7 +33,7 @@ def fix_case(match):
     surname, name, case = match[1].split()
     case = case_translations[case]
 
-    gender = detector.detect(firstname=name, lastname=surname)
+    gender = detector.detect(firstname=name.lower(), lastname=surname.lower())
     name = maker.make(NamePart.FIRSTNAME, gender, case, name)
     surname = maker.make(NamePart.LASTNAME, gender, case, surname)
     return f"{surname} {name}"
@@ -41,10 +41,10 @@ def fix_case(match):
 
 async def send_messages(changes):
     for user, old, new, task, is_first_solve in changes:
-        name, surname = user["name"].split()
+        surname, name = user["name"].split()
         for patterns, messages_list in messages:
             if all(re.fullmatch(patterns[key], str(new[key])) for key in patterns):
-                is_female = detector.detect(firstname=name, lastname=surname) == Gender.FEMALE
+                is_female = detector.detect(firstname=name.lower(), lastname=surname.lower()) == Gender.FEMALE
                 message = random.choice(messages_list).format(name=user["name"], task=task, penalty=new["penalty"], verdict=new["verdict"])
                 message = gender_regex.sub(lambda match: match[1].split("/")[is_female], message)
                 message = number_regex.sub(fix_number, message)
@@ -61,6 +61,7 @@ async def send_messages(changes):
                 except Exception as e:
                     # TODO: make a queue for sending again instead
                     logging.error(f"Got an error while sending main message: {e}")
+                    logging.error(message)
                 break
 
 

@@ -3,7 +3,7 @@ from aiogram import F, Router, types
 from aiogram.filters import Command
 from tabulate import tabulate
 
-from config import CONFIG, reversed_title_replacements
+from config import CONFIG, reversed_title_replacements, ALPHABET
 from utils import batched, format_time, take_page
 
 router = Router()
@@ -30,7 +30,7 @@ async def stats(message: types.Message):
         buttons = [
             [types.InlineKeyboardButton(text=text, callback_data="*" + text + ":" + user_ids[0]) for text in row]
             for row in
-            batched(reversed_title_replacements, 2)
+            batched(("Все", *reversed_title_replacements), 2)
         ]
         await message.answer(
             "Выберите контест",
@@ -86,24 +86,46 @@ async def stats_callback(callback: types.CallbackQuery):
     if not take_page(callback):
         return await callback.answer("Эта таблица занята другим пользователем")
     contest_title, user_id = callback.data[1:].split(":")
-    contest, = (contest for contest in CONFIG.data["contests"] if contest["title"] == reversed_title_replacements[contest_title])
-    solves = contest["users"][user_id]
-
-    headers = ("~ Задача", "Штраф", "Вердикт", "Время")
-    align = ("left", "right", "right", "right")
-
-    table_data = []
-    for i in range(len(contest["problems"])):
-        t = int(solves[i]["time"])
-        table_data.append((f"{contest['problems'][i]['short']}. {contest['problems'][i]['long']}", solves[i]["penalty"], solves[i]["verdict"], format_time(t)))
-    result_string = "```\n" + tabulate(table_data, headers, colalign=align) + "\n```"
     buttons = [
         [types.InlineKeyboardButton(text=text, callback_data="*" + text + ":" + user_id) for text in row]
         for row in
-        batched(reversed_title_replacements, 2)
+        batched(("Все", *reversed_title_replacements), 2)
     ]
-    try:
-        await callback.message.edit_text(result_string, reply_markup=types.InlineKeyboardMarkup(inline_keyboard=buttons), parse_mode="markdown")
-    except aiogram.exceptions.TelegramBadRequest:
-        return await callback.answer("Уже выбран этот контест!")
-    await callback.answer()
+    if contest_title == "Все":
+        result_string = "```\n"
+        result_string += f"Всего {sum(s['verdict'] == 'OK' for contest in CONFIG.data['contests'] for s in contest['users'][user_id])}/{sum(len(contest['problems']) for contest in CONFIG.data['contests'])}\n"
+        for contest in CONFIG.data["contests"]:
+            solves = contest["users"][user_id]
+            result_string += f'{contest["title"]} ({sum(solve["verdict"] == "OK" for solve in solves)}/{len(contest["problems"])})\n'
+            for p in batched(range(len(contest["problems"])), 12):
+                for i in p:
+                    result_string += ALPHABET[i].center(5, " ")
+                result_string += "\n"
+                for i in p:
+                    cur = str(solves[i]["penalty"] or "")
+                    if solves[i]["verdict"] == "OK":
+                        cur = "+" + cur
+                    elif cur:
+                        cur = "-" + cur
+                    result_string += cur.center(5, " ")
+                result_string += "\n"
+        result_string += "```\n"
+        await callback.message.edit_text(result_string, parse_mode="markdown")
+        await callback.answer()
+    else:
+        contest, = (contest for contest in CONFIG.data["contests"] if contest["title"] == reversed_title_replacements[contest_title])
+        solves = contest["users"][user_id]
+
+        headers = ("~ Задача", "Штраф", "Вердикт", "Время")
+        align = ("left", "right", "right", "right")
+
+        table_data = []
+        for i in range(len(contest["problems"])):
+            t = int(solves[i]["time"])
+            table_data.append((f"{contest['problems'][i]['short']}. {contest['problems'][i]['long']}", solves[i]["penalty"], solves[i]["verdict"], format_time(t)))
+        result_string = "```\n" + tabulate(table_data, headers, colalign=align) + "\n```"
+        try:
+            await callback.message.edit_text(result_string, reply_markup=types.InlineKeyboardMarkup(inline_keyboard=buttons), parse_mode="markdown")
+        except aiogram.exceptions.TelegramBadRequest:
+            return await callback.answer("Уже выбран этот контест!")
+        await callback.answer()

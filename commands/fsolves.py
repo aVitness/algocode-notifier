@@ -3,7 +3,7 @@ from aiogram import F, Router, types
 from aiogram.filters import Command
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from config import CONFIG, first_solves_message, reversed_title_replacements, title_replacements
+from config import CONFIG, first_solves_message, reversed_title_replacements, title_replacements, ALPHABET
 from utils import batched, format_time, take_page
 
 router = Router()
@@ -30,8 +30,8 @@ async def show_first_solves(callback: types.CallbackQuery):
 
     for i in range(len(contest["problems"])):
         builder.add(types.InlineKeyboardButton(
-            text=chr(ord("A") + i),
-            callback_data="!" + contest_title + ":" + chr(ord("A") + i))
+            text=ALPHABET[i],
+            callback_data="!" + contest_title + ":" + ALPHABET[i])
         )
     await callback.message.edit_text(
         "Выберите задачу",
@@ -66,8 +66,8 @@ async def show_first_callback(callback: types.CallbackQuery):
     builder = InlineKeyboardBuilder()
     for i in range(len(contest["problems"])):
         builder.add(types.InlineKeyboardButton(
-            text=chr(ord("A") + i),
-            callback_data="!" + title_replacements[contest_title] + ":" + chr(ord("A") + i))
+            text=ALPHABET[i],
+            callback_data="!" + title_replacements[contest_title] + ":" + ALPHABET[i])
         )
     try:
         await callback.message.edit_text(result_string, reply_markup=builder.as_markup(), parse_mode="markdown")
