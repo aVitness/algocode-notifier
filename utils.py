@@ -5,20 +5,24 @@ from itertools import islice
 
 import pymorphy3
 from aiogram import types
-from pytrovich.detector import PetrovichGenderDetector
-from pytrovich.enums import Case
+from pytrovich.enums import Case, Gender
 from pytrovich.maker import PetrovichDeclinationMaker
 from tabulate import tabulate
 
 from config import CONFIG, time_now
 
-detector = PetrovichGenderDetector()
 morph = pymorphy3.MorphAnalyzer()
 gender_regex = re.compile(r"\[([^\[\]]+)\]")
 number_regex = re.compile(r"%([^%]+)%")
 case_regex = re.compile(r"@([^@]+)@")
 maker = PetrovichDeclinationMaker()
 case_translations = {"gent": Case.GENITIVE, "datv": Case.DATIVE, "accs": Case.ACCUSATIVE, "ablt": Case.INSTRUMENTAL, "loct": Case.PREPOSITIONAL}
+
+with open("female_names_rus.txt", encoding="utf-8") as file:
+    female_names = set(file.read().split())
+
+def detect(name):
+    return (Gender.MALE, Gender.FEMALE)[name in female_names]
 
 
 def batched(iterable, n):

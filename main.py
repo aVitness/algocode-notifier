@@ -5,9 +5,10 @@ import os.path
 import random
 from copy import deepcopy
 from datetime import timedelta
-from pytrovich.enums import NamePart, Gender
+
 import aiohttp
 from aiogram import Bot, Dispatcher
+from pytrovich.enums import NamePart
 
 from config import *
 from utils import *
@@ -33,7 +34,7 @@ def fix_case(match):
     surname, name, case = match[1].split()
     case = case_translations[case]
 
-    gender = detector.detect(firstname=name.lower(), lastname=surname.lower())
+    gender = detect(name)
     name = maker.make(NamePart.FIRSTNAME, gender, case, name)
     surname = maker.make(NamePart.LASTNAME, gender, case, surname)
     return f"{surname} {name}"
@@ -44,7 +45,7 @@ async def send_messages(changes):
         surname, name = user["name"].split()
         for patterns, messages_list in messages:
             if all(re.fullmatch(patterns[key], str(new[key])) for key in patterns):
-                is_female = detector.detect(firstname=name.lower(), lastname=surname.lower()) == Gender.FEMALE
+                is_female = detect(name) == Gender.FEMALE
                 message = random.choice(messages_list).format(name=user["name"], task=task, penalty=new["penalty"], verdict=new["verdict"])
                 message = gender_regex.sub(lambda match: match[1].split("/")[is_female], message)
                 message = number_regex.sub(fix_number, message)
