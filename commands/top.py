@@ -5,8 +5,8 @@ from aiogram.filters import Command
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from tabulate import tabulate
 
-from config import CONFIG
-from utils import total_score_and_penalty, take_page
+from utils.standings import USERS, get_total_scores
+from utils.times import take_page, page_authors
 
 router = Router()
 
@@ -16,14 +16,11 @@ stats = [None, None]
 
 
 def generate(page, target):
-    global last_update, stats, scores
-    if time.time() - last_update > 60:
-        scores = total_score_and_penalty(CONFIG.data["contests"])
-        stats = [sorted(scores, key=lambda key: scores[key], reverse=True), sorted(scores, key=lambda key: scores[key][::-1], reverse=True)]
-        last_update = time.time()
+    scores = get_total_scores()
     if page < 0 or 15 * page >= len(scores):
         return
-    return [(place, CONFIG.users[user_id]["name"], scores[user_id][target]) for place, user_id in
+    stats = [sorted(scores, key=lambda key: scores[key], reverse=True), sorted(scores, key=lambda key: scores[key][::-1], reverse=True)]
+    return [(place, USERS[user_id]["name"], scores[user_id][target]) for place, user_id in
             enumerate(stats[target][page * 15:(page + 1) * 15], start=page * 15 + 1)]
 
 
@@ -54,7 +51,7 @@ async def penalty_top(message: types.Message):
     headers = ("*", "Имя", "Штраф")
     result = f"Топ по штрафам, страница 1\n" + "```\n" + tabulate(table_data, headers, tablefmt="psql") + "\n```"
     msg = await message.answer(result, parse_mode="markdown", reply_markup=keyboard("pt", 0))
-    CONFIG.page_authors[msg.message_id] = (message.from_user.id, int(time.time()))
+    page_authors[msg.message_id] = (message.from_user.id, int(time.time()))
 
 
 @router.callback_query(F.data.startswith("pt"))
@@ -77,7 +74,7 @@ async def score_top(message: types.Message):
     headers = ("*", "Имя", "Решено")
     result = f"Топ по успешным посылкам, страница 1\n" + "```\n" + tabulate(table_data, headers, tablefmt="psql") + "\n```"
     msg = await message.answer(result, parse_mode="markdown", reply_markup=keyboard("st", 0))
-    CONFIG.page_authors[msg.message_id] = (message.from_user.id, int(time.time()))
+    page_authors[msg.message_id] = (message.from_user.id, int(time.time()))
 
 
 @router.callback_query(F.data.startswith("st"))

@@ -1,10 +1,13 @@
+import time
+
 import aiogram
 from aiogram import F, Router, types
 from aiogram.filters import Command
 from tabulate import tabulate
 
-from config import CONFIG, reversed_title_replacements, ALPHABET
-from utils import batched, format_time, take_page
+from commands.fsolves import batched
+from utils.standings import CONTESTS, USERS_BY_NAME, STANDINGS
+from utils.times import take_page, page_authors, format_time
 
 router = Router()
 
@@ -14,36 +17,39 @@ async def stats(message: types.Message):
     msg = message.text.split(maxsplit=1)
     if len(msg) == 1:
         buttons = [
-            [types.InlineKeyboardButton(text=text, callback_data="?" + text) for text in row]
+            [types.InlineKeyboardButton(text=CONTESTS[contest_id]["title"], callback_data=f"?{contest_id}") for contest_id in row]
             for row in
-            batched(reversed_title_replacements, 2)
+            batched(CONTESTS, 2)
         ]
-        await message.answer(
+        msg = await message.answer(
             "Выберите контест",
             reply_markup=types.InlineKeyboardMarkup(inline_keyboard=buttons)
         )
+        page_authors[msg.message_id] = (message.from_user.id, int(time.time()))
     elif len(msg) == 2:
-        user_ids = [user_id for user_id in CONFIG.users if CONFIG.users[user_id]["name"] == msg[1]]
-        if not user_ids:
+        user = USERS_BY_NAME.get(msg[1])
+        if not user:
             return message.answer("Человек с таким именем не найден.")
-
         buttons = [
-            [types.InlineKeyboardButton(text=text, callback_data="*" + text + ":" + user_ids[0]) for text in row]
-            for row in
-            batched(("Все", *reversed_title_replacements), 2)
+            [
+                types.InlineKeyboardButton(text="Все" if contest_id == "Все" else CONTESTS[contest_id]["title"], callback_data=f"*{contest_id}:{user['id']}")
+                for contest_id in row
+            ]
+            for row in batched(("Все", *CONTESTS), 2)
         ]
-        await message.answer(
+        msg = await message.answer(
             "Выберите контест",
             reply_markup=types.InlineKeyboardMarkup(inline_keyboard=buttons)
         )
+        page_authors[msg.message_id] = (message.from_user.id, int(time.time()))
 
 
 @router.callback_query(F.data.startswith("?"))
 async def stats_callback(callback: types.CallbackQuery):
     if not take_page(callback):
         return await callback.answer("Эта таблица занята другим пользователем")
-    contest_title = callback.data[1:]
-    contest, = (contest for contest in CONFIG.data["contests"] if contest["title"] == reversed_title_replacements[contest_title])
+    contest_id = callback.data[1:]
+    contest = CONTESTS[contest_id]
 
     headers = ("~ Задача", "Попыток", "Решавших", "Успешных", "% успешных", "% решивших")
     align = ("left", "right", "right", "right", "right", "right")
@@ -51,9 +57,7 @@ async def stats_callback(callback: types.CallbackQuery):
     table_data = []
     for i in range(len(contest["problems"])):
         current = [f"{contest['problems'][i]['short']}. {contest['problems'][i]['long']}", 0, 0, 0, None, None]
-        for user_id in CONFIG.users:
-            if user_id not in contest["users"]:
-                continue
+        for user_id in contest["users"]:
             solve = contest["users"][user_id][i]
             if solve["verdict"] is not None:
                 current[2] += 1
@@ -70,9 +74,9 @@ async def stats_callback(callback: types.CallbackQuery):
     result_string = "```\n" + tabulate(table_data, headers, colalign=align) + "\n```"
 
     buttons = [
-        [types.InlineKeyboardButton(text=text, callback_data="?" + text) for text in row]
+        [types.InlineKeyboardButton(text=CONTESTS[contest_id]["title"], callback_data=f"?{contest_id}") for contest_id in row]
         for row in
-        batched(reversed_title_replacements, 2)
+        batched(CONTESTS, 2)
     ]
     try:
         await callback.message.edit_text(result_string, reply_markup=types.InlineKeyboardMarkup(inline_keyboard=buttons), parse_mode="markdown")
@@ -85,35 +89,46 @@ async def stats_callback(callback: types.CallbackQuery):
 async def stats_callback(callback: types.CallbackQuery):
     if not take_page(callback):
         return await callback.answer("Эта таблица занята другим пользователем")
-    contest_title, user_id = callback.data[1:].split(":")
+    contest_id, user_id = callback.data[1:].split(":")
     buttons = [
-        [types.InlineKeyboardButton(text=text, callback_data="*" + text + ":" + user_id) for text in row]
-        for row in
-        batched(("Все", *reversed_title_replacements), 2)
+        [
+            types.InlineKeyboardButton(text="Все" if contest_id == "Все" else CONTESTS[contest_id]["title"], callback_data=f"*{contest_id}:{user_id}")
+            for contest_id in row
+        ]
+        for row in batched(("Все", *CONTESTS), 2)
     ]
-    if contest_title == "Все":
+    if contest_id == "Все":
+        solved = total = 0
+        for table in STANDINGS:
+            for contest in table["contests"]:
+                total += len(contest["problems"])
+                solved += sum(solve['verdict'] == 'OK' for solve in contest['users'][user_id])
+
         result_string = "```\n"
-        result_string += f"Всего {sum(s['verdict'] == 'OK' for contest in CONFIG.data['contests'] for s in contest['users'][user_id])}/{sum(len(contest['problems']) for contest in CONFIG.data['contests'])}\n"
-        for contest in CONFIG.data["contests"]:
-            solves = contest["users"][user_id]
-            result_string += f'{contest["title"]} ({sum(solve["verdict"] == "OK" for solve in solves)}/{len(contest["problems"])})\n'
-            for p in batched(range(len(contest["problems"])), 12):
-                for i in p:
-                    result_string += ALPHABET[i].center(5, " ")
-                result_string += "\n"
-                for i in p:
-                    cur = str(solves[i]["penalty"] or "")
-                    if solves[i]["verdict"] == "OK":
-                        cur = "+" + cur
-                    elif cur:
-                        cur = "-" + cur
-                    result_string += cur.center(5, " ")
-                result_string += "\n"
+        result_string += f"Всего {solved}/{total}\n"
+        for table in STANDINGS:
+            for contest in table["contests"]:
+                solves = contest["users"][user_id]
+                result_string += f'{contest["title"]} ({sum(solve["verdict"] == "OK" for solve in solves)}/{len(contest["problems"])})\n'
+                for p in batched(range(len(contest["problems"])), 12):
+                    for i in p:
+                        result_string += contest["problems"][i]["short"].center(5, " ")
+                    result_string += "\n"
+                    for i in p:
+                        cur = str(solves[i]["penalty"] or "")
+                        if solves[i]["verdict"] == "OK":
+                            cur = "+" + cur
+                        elif cur:
+                            cur = "-" + cur
+                        result_string += cur.center(5, " ")
+                    result_string += "\n"
         result_string += "```\n"
+        if len(result_string) >= 4090:  # эх
+            result_string = result_string[:4080] + "...\n```\n"
         await callback.message.edit_text(result_string, parse_mode="markdown")
         await callback.answer()
     else:
-        contest, = (contest for contest in CONFIG.data["contests"] if contest["title"] == reversed_title_replacements[contest_title])
+        contest = CONTESTS[contest_id]
         solves = contest["users"][user_id]
 
         headers = ("~ Задача", "Штраф", "Вердикт", "Время")
@@ -122,7 +137,8 @@ async def stats_callback(callback: types.CallbackQuery):
         table_data = []
         for i in range(len(contest["problems"])):
             t = int(solves[i]["time"])
-            table_data.append((f"{contest['problems'][i]['short']}. {contest['problems'][i]['long']}", solves[i]["penalty"], solves[i]["verdict"], format_time(t)))
+            table_data.append(
+                (f"{contest['problems'][i]['short']}. {contest['problems'][i]['long']}", solves[i]["penalty"], solves[i]["verdict"], format_time(t)))
         result_string = "```\n" + tabulate(table_data, headers, colalign=align) + "\n```"
         try:
             await callback.message.edit_text(result_string, reply_markup=types.InlineKeyboardMarkup(inline_keyboard=buttons), parse_mode="markdown")

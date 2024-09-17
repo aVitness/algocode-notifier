@@ -1,37 +1,53 @@
+import time
+from itertools import islice
+
 import aiogram
 from aiogram import F, Router, types
 from aiogram.filters import Command
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from config import CONFIG, first_solves_message, reversed_title_replacements, title_replacements, ALPHABET
-from utils import batched, format_time, take_page
+from messages import TOP_3_FIRST_SOLVES
+from utils.standings import CONTESTS, USERS
+from utils.times import format_time, page_authors, take_page
 
 router = Router()
+
+
+def batched(iterable, n):
+    it = iter(iterable)
+    while True:
+        batch = list(islice(it, n))
+        if not batch:
+            return
+        yield batch
 
 
 @router.message(Command("fsolves"))
 async def first_solves(message: types.Message):
     buttons = [
-        [types.InlineKeyboardButton(text=text, callback_data="#" + text) for text in row]
+        [types.InlineKeyboardButton(text=CONTESTS[contest_id]["title"], callback_data=f"#{contest_id}") for contest_id in row]
         for row in
-        batched(reversed_title_replacements, 2)
+        batched(CONTESTS, 2)
     ]
-    await message.answer(
+    msg = await message.answer(
         "Выберите контест",
         reply_markup=types.InlineKeyboardMarkup(inline_keyboard=buttons)
     )
+    page_authors[msg.message_id] = (message.from_user.id, int(time.time()))
 
 
 @router.callback_query(F.data.startswith("#"))
 async def show_first_solves(callback: types.CallbackQuery):
+    if not take_page(callback):
+        return await callback.answer("Эта таблица занята другим пользователем")
     builder = InlineKeyboardBuilder()
-    contest_title = callback.data[1:]
-    contest, = (contest for contest in CONFIG.data["contests"] if contest["title"] == reversed_title_replacements[contest_title])
+    contest_id = callback.data[1:]
+    contest = CONTESTS[contest_id]
 
     for i in range(len(contest["problems"])):
         builder.add(types.InlineKeyboardButton(
-            text=ALPHABET[i],
-            callback_data="!" + contest_title + ":" + ALPHABET[i])
+            text=contest["problems"][i]["short"],
+            callback_data=f"!{contest_id}:{i}")
         )
     await callback.message.edit_text(
         "Выберите задачу",
@@ -43,17 +59,14 @@ async def show_first_solves(callback: types.CallbackQuery):
 async def show_first_callback(callback: types.CallbackQuery):
     if not take_page(callback):
         return await callback.answer("Эта таблица занята другим пользователем")
-    contest_title, task_l = callback.data[1:].split(":")
-    contest_title = reversed_title_replacements[contest_title]
-    contest, = (contest for contest in CONFIG.data["contests"] if contest["title"] == contest_title)
-    task = contest["problems"][ord(task_l) - ord("A")]
+    contest_id, task = callback.data[1:].split(":")
+    task = int(task)
+    contest = CONTESTS[contest_id]
     solves = []
-    for user_id in CONFIG.users:
-        if user_id not in contest["users"]:
-            continue
-        result = contest["users"][user_id][ord(task_l) - ord("A")]
+    for user_id in contest["users"]:
+        result = contest["users"][user_id][task]
         if result["verdict"] == "OK":
-            solves.append((result["time"], CONFIG.users[user_id]["name"]))
+            solves.append((result["time"], USERS[user_id]["name"]))
     solves = sorted(solves)[:3]
     while len(solves) < 3:
         solves.append((-1, "-"))
@@ -61,13 +74,16 @@ async def show_first_callback(callback: types.CallbackQuery):
         name + (f" ({format_time(int(time))})" if time > 0 else "")
         for time, name in solves
     ]
-    result_string = first_solves_message.format(first=solves[0], second=solves[1], third=solves[2], task=f"{contest_title} - {task_l} ({task['long']})")
+    result_string = TOP_3_FIRST_SOLVES.format(
+        first=solves[0], second=solves[1], third=solves[2],
+        task=f"{contest['title']} - {contest['problems'][task]['short']} ({contest['problems'][task]['long']})"
+    )
 
     builder = InlineKeyboardBuilder()
     for i in range(len(contest["problems"])):
         builder.add(types.InlineKeyboardButton(
-            text=ALPHABET[i],
-            callback_data="!" + title_replacements[contest_title] + ":" + ALPHABET[i])
+            text=contest["problems"][i]["short"],
+            callback_data=f"!{contest_id}:{i}")
         )
     try:
         await callback.message.edit_text(result_string, reply_markup=builder.as_markup(), parse_mode="markdown")

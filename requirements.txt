@@ -1,7 +1,0 @@
-aiohttp
-aiogram
-tabulate
-pytz
-python-dotenv
-pymorphy3
-pytrovich
