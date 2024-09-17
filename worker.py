@@ -15,10 +15,11 @@ from utils.times import *
 
 async def send_messages(bot, changes):
     for user, old, new, task, is_first_solve in changes:
-        surname, name = user["name"].split()
         for patterns, messages_list in MESSAGES:
             if all(re.fullmatch(patterns[key], str(new[key])) for key in patterns):
-                is_female = detect(name) == Gender.FEMALE
+                is_female = False
+                if len(user["name"].split()) == 2:
+                    is_female = detect(user["name"].split()[1]) == Gender.FEMALE
                 message = random.choice(messages_list).format(name=user["name"], task=task, penalty=new["penalty"], verdict=new["verdict"])
                 message = fix_main_message(message, is_female)
 
@@ -28,7 +29,7 @@ async def send_messages(bot, changes):
                     if is_first_solve:
                         await bot.send_message(
                             CHAT_ID,
-                            gender_regex.sub(lambda match: match[1].split("/")[is_female], FIRST_SOLVE.format(name=name, task=task)),
+                            gender_regex.sub(lambda match: match[1].split("/")[is_female], FIRST_SOLVE.format(name=user["name"], task=task)),
                             parse_mode="markdown"
                         )
 
