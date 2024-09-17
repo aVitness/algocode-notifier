@@ -1,0 +1,6 @@
+aiohttp
+aiogram
+tabulate
+pytz
+pymorphy3
+pytrovich
