@@ -59,7 +59,7 @@ async def job(bot):
         old_contests = {contest["id"]: contest for contest in table.old_data["contests"]}
         for contest in table["contests"]:
             if contest["id"] not in old_contests:
-                message = f"*Добавлен новый контест*\n[{contest['title']}](https://ejudge.algocode.ru/cgi-bin/new-client?contest_id={contest['id']})\n\n"
+                message = f"*Добавлен новый контест*\n[{contest['title']}](https://ejudge.algocode.ru/cgi-bin/new-client?contest_id={contest['ejudge_id']})\n\n"
                 for problem in contest["problems"]:
                     message += f"{problem['short']} - {problem['long']}\n"
                 await bot.send_message(CHAT_ID, message, parse_mode="markdown")
