@@ -18,7 +18,7 @@ async def send_messages(bot, changes):
         for patterns, messages_list in MESSAGES:
             if all(re.fullmatch(patterns[key], str(new[key])) for key in patterns):
                 is_female = False
-                if len(user["name"].split()) == 2:
+                if len(user["name"].split()) >= 2:
                     is_female = detect(user["name"].split()[1]) == Gender.FEMALE
                 message = random.choice(messages_list).format(name=user["name"], task=task, penalty=new["penalty"], verdict=new["verdict"])
                 message = fix_main_message(message, is_female)

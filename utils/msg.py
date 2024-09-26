@@ -26,13 +26,25 @@ def fix_number(match):
 
 
 def fix_case(match):
-    surname, name, case = match[1].split()
-    case = case_translations[case]
+    data = match[1].split()
+    middlename = None
+    if len(data) == 3:
+        surname, name, case = data
+    elif len(data) == 4:
+        surname, name, middlename, case = data
+    else:
+        return data[0]
 
+    case = case_translations[case]
     gender = detect(name)
+
     name = maker.make(NamePart.FIRSTNAME, gender, case, name)
     surname = maker.make(NamePart.LASTNAME, gender, case, surname)
-    return f"{surname} {name}"
+    result = f"{surname} {name}"
+    if middlename is not None:
+        middlename = maker.make(NamePart.MIDDLENAME, gender, case, middlename)
+        result += f" {middlename}"
+    return result
 
 
 def fix_main_message(message, is_female):
