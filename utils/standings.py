@@ -20,14 +20,19 @@ class Standings:
     async def load(self, retries=2):
         if retries == 0:
             return False
-        self.old_data = copy.deepcopy(self.data)
 
         async with aiohttp.ClientSession() as session:
             async with session.get(self.url) as response:
-                self.data = await response.json(encoding="utf-8")
+                new_data = await response.json(encoding="utf-8")
                 status = response.status
         if status != 200:
             return await self.load(retries - 1)
+
+        for contest in self["contests"]:
+            if not any(contest["id"] == str(new_contest["id"]) for new_contest in new_data["contests"]):
+                new_data["contests"].append(contest)
+        self.old_data = copy.deepcopy(self.data)
+        self.data = new_data
 
         for user in self["users"]:
             user["id"] = str(user["id"])
